@@ -74,3 +74,4 @@ pytest tests/test_git_utils.py -v
 | `GEMINI_API_KEY` | Google AI Studio API 키 (필수) |
 
 API 키는 [Google AI Studio](https://aistudio.google.com/app/apikey)에서 발급받을 수 있습니다.
+Claude나 OpenAI도 추가 구현 생각중입니다.

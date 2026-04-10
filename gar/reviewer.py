@@ -12,7 +12,7 @@ from google.genai import types
 
 load_dotenv()
 
-MODEL = "gemini-2.0-flash-lite"
+MODEL = "gemini-2.5-flash-lite"
 
 SYSTEM_PROMPT = """\
 You are an expert code reviewer. Analyze the provided git diff and respond in Korean \
