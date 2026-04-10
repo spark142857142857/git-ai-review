@@ -72,7 +72,7 @@ def test_parse_diff_binary_file():
     result = parse_diff(diff)
     assert len(result) == 1
     assert result[0].path == "image.png"
-    assert result[0].hunks == ["[바이너리 파일 변경]"]
+    assert result[0].hunks == ["[binary file changed]"]
 
 
 def test_parse_diff_binary_new_file():
@@ -83,7 +83,7 @@ def test_parse_diff_binary_new_file():
     )
     result = parse_diff(diff)
     assert len(result) == 1
-    assert result[0].hunks == ["[바이너리 파일 변경]"]
+    assert result[0].hunks == ["[binary file changed]"]
 
 
 def test_file_diff_bool_false_when_no_hunks():
@@ -128,5 +128,5 @@ def test_run_git_diff_commit():
 def test_run_git_diff_raises_on_nonzero_exit():
     mock_result = MagicMock(returncode=128, stdout="", stderr="not a git repo")
     with patch("subprocess.run", return_value=mock_result):
-        with pytest.raises(RuntimeError, match="git diff 실패"):
+        with pytest.raises(RuntimeError, match="git diff failed"):
             run_git_diff()

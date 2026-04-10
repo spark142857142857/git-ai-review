@@ -1,4 +1,4 @@
-"""Typer CLI 진입점."""
+"""Typer CLI entry point."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ MAX_FILES = 20
 
 app = typer.Typer(
     name="gar",
-    help="git diff를 자동으로 읽어서 Gemini AI로 코드 리뷰를 출력하는 CLI 도구.",
+    help="A CLI tool that reads git diff and delivers AI-powered code reviews via Gemini.",
     add_completion=False,
 )
 console = Console()
@@ -50,69 +50,73 @@ def main(
 def review(
     staged: Annotated[
         bool,
-        typer.Option("--staged", "-s", help="staged 변경사항만 리뷰 (git diff --staged)"),
+        typer.Option("--staged", "-s", help="Review only staged changes (git diff --staged)"),
     ] = False,
     commit: Annotated[
         Optional[str],
-        typer.Option("--commit", "-c", help="특정 커밋 해시 리뷰 (예: abc1234)"),
+        typer.Option("--commit", "-c", help="Review a specific commit hash (e.g. abc1234)"),
     ] = None,
     output: Annotated[
         OutputFormat,
-        typer.Option("--output", "-o", help="출력 형식: terminal(기본) 또는 md(파일 저장)"),
+        typer.Option("--output", "-o", help="Output format: terminal (default) or md (save to file)"),
     ] = OutputFormat.terminal,
     output_file: Annotated[
         Optional[Path],
-        typer.Option("--output-file", "-f", help="마크다운 저장 경로 (--output md 시 사용)"),
+        typer.Option("--output-file", "-f", help="Markdown output path (used with --output md)"),
     ] = None,
     repo: Annotated[
         Optional[Path],
-        typer.Option("--repo", "-r", help="git 리포지터리 경로 (기본: 현재 디렉토리)"),
+        typer.Option("--repo", "-r", help="Path to the git repository (default: cwd)"),
     ] = None,
+    lang: Annotated[
+        str,
+        typer.Option("--lang", "-l", help="Review language: en (default, English) or ko (Korean)"),
+    ] = "en",
 ) -> None:
-    """git diff를 읽어서 Gemini AI로 코드 리뷰를 실행한다."""
-    # 1. git diff 실행
+    """Read git diff and run Gemini AI code review."""
+    # 1. run git diff
     try:
         raw = run_git_diff(staged=staged, commit=commit, repo_path=repo)
     except RuntimeError as exc:
-        err_console.print(f"[bold red]오류:[/bold red] {exc}")
+        err_console.print(f"[bold red]Error:[/bold red] {exc}")
         raise typer.Exit(1) from exc
 
     if not raw.strip():
-        console.print("[yellow]변경된 파일이 없습니다.[/yellow]")
+        console.print("[yellow]No changed files found.[/yellow]")
         raise typer.Exit()
 
-    # 2. diff 파싱
+    # 2. parse diff
     file_diffs = parse_diff(raw)
     if not file_diffs:
-        console.print("[yellow]파싱 가능한 diff가 없습니다.[/yellow]")
+        console.print("[yellow]No parseable diff found.[/yellow]")
         raise typer.Exit()
 
-    # 파일 수 제한
+    # file limit
     if len(file_diffs) > MAX_FILES:
         console.print(
-            f"[yellow]⚠ 파일이 {len(file_diffs)}개입니다. "
-            f"처음 {MAX_FILES}개만 리뷰합니다.[/yellow]"
+            f"[yellow]⚠ {len(file_diffs)} files detected. "
+            f"Reviewing only the first {MAX_FILES}.[/yellow]"
         )
         file_diffs = file_diffs[:MAX_FILES]
 
-    console.print(f"[dim]리뷰 대상: {len(file_diffs)}개 파일[/dim]")
+    console.print(f"[dim]Reviewing {len(file_diffs)} file(s)[/dim]")
 
-    # 3. Gemini 리뷰 (스피너)
+    # 3. Gemini review (spinner)
     if len(file_diffs) == 1:
         spinner_label = file_diffs[0].path
     else:
-        spinner_label = f"{len(file_diffs)}개 파일"
+        spinner_label = f"{len(file_diffs)} files"
 
     try:
-        with console.status(f"[bold cyan]🔍 Gemini 리뷰 중... ({spinner_label})[/bold cyan]"):
-            results = review_all(file_diffs)
+        with console.status(f"[bold cyan]🔍 Reviewing with Gemini... ({spinner_label})[/bold cyan]"):
+            results = review_all(file_diffs, lang=lang)
     except EnvironmentError as exc:
-        err_console.print(f"[bold red]환경 설정 오류:[/bold red] {exc}")
+        err_console.print(f"[bold red]Configuration error:[/bold red] {exc}")
         raise typer.Exit(1) from exc
 
-    # 4. 출력
+    # 4. output
     if output == OutputFormat.md:
         path = save_markdown(results, output_file)
-        console.print(f"[green]마크다운 저장 완료:[/green] {path}")
+        console.print(f"[green]Markdown saved:[/green] {path}")
     else:
         print_all_reviews(results)

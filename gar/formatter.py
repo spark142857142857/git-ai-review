@@ -1,4 +1,4 @@
-"""Rich를 이용한 터미널 출력 및 마크다운 저장."""
+"""Terminal output and markdown export using Rich."""
 
 from __future__ import annotations
 
@@ -21,11 +21,11 @@ def print_header(title: str = "git-ai-review") -> None:
 
 
 def print_review(result: ReviewResult) -> None:
-    """단일 파일 리뷰를 Rich 패널로 출력한다."""
+    """Print a single file review as a Rich panel."""
     if result.error:
         console.print(
             Panel(
-                Text(f"[오류] {result.error}", style="red"),
+                Text(f"[error] {result.error}", style="red"),
                 title=f"[bold red]{result.path}[/bold red]",
                 border_style="red",
             )
@@ -45,20 +45,20 @@ def print_review(result: ReviewResult) -> None:
 
 def print_all_reviews(results: list[ReviewResult]) -> None:
     print_header()
-    console.print(f"[dim]총 {len(results)}개 파일 리뷰[/dim]\n")
+    console.print(f"[dim]{len(results)} file(s) reviewed[/dim]\n")
     for result in results:
         print_review(result)
         console.print()
 
     failed = [r for r in results if not r.ok]
     if failed:
-        console.print(Rule("[bold red]리뷰 실패 목록[/bold red]"))
+        console.print(Rule("[bold red]Failed Reviews[/bold red]"))
         for r in failed:
             console.print(f"[red]✗ {r.path}:[/red] {r.error}")
 
 
 def save_markdown(results: list[ReviewResult], output_path: Path | None = None) -> Path:
-    """리뷰 결과를 마크다운 파일로 저장한다."""
+    """Save review results to a markdown file."""
     if output_path is None:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_path = Path(f"review_{timestamp}.md")
@@ -72,13 +72,13 @@ def save_markdown(results: list[ReviewResult], output_path: Path | None = None) 
     for result in results:
         lines.append(f"## `{result.path}`\n")
         if result.error:
-            lines.append(f"> **오류**: {result.error}\n")
+            lines.append(f"> **Error**: {result.error}\n")
         else:
             lines.append(result.review)
         lines.append("\n---\n")
 
     if output_path.exists():
-        console.print(f"[yellow]⚠ 파일이 이미 존재합니다. 덮어씁니다: {output_path}[/yellow]")
+        console.print(f"[yellow]⚠ File already exists. Overwriting: {output_path}[/yellow]")
 
     output_path.write_text("\n".join(lines), encoding="utf-8")
     return output_path

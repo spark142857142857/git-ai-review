@@ -1,4 +1,4 @@
-"""git diff 실행 및 파싱 유틸리티."""
+"""Utilities for running and parsing git diff output."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from pathlib import Path
 @dataclass
 class FileDiff:
     path: str
-    old_path: str | None  # 파일 rename 시 원래 경로
+    old_path: str | None  # original path when the file is renamed
     hunks: list[str] = field(default_factory=list)
 
     @property
@@ -28,12 +28,12 @@ def run_git_diff(
     commit: str | None = None,
     repo_path: Path | None = None,
 ) -> str:
-    """git diff를 실행하고 raw 출력을 반환한다.
+    """Run git diff and return the raw output.
 
-    우선순위:
-      1. commit 지정 → git show --format= <commit>  (첫 커밋도 동작)
-      2. staged=True  → git diff --staged
-      3. 기본         → git diff HEAD
+    Priority:
+      1. commit specified → git show --format= <commit>  (safe for initial commit)
+      2. staged=True      → git diff --staged
+      3. default          → git diff HEAD
     """
     cwd = str(repo_path) if repo_path else None
 
@@ -55,14 +55,14 @@ def run_git_diff(
 
     if result.returncode != 0:
         raise RuntimeError(
-            f"git diff 실패 (exit {result.returncode}):\n{result.stderr.strip()}"
+            f"git diff failed (exit {result.returncode}):\n{result.stderr.strip()}"
         )
 
     return result.stdout
 
 
 def parse_diff(raw_diff: str) -> list[FileDiff]:
-    """unified diff 텍스트를 FileDiff 목록으로 파싱한다."""
+    """Parse unified diff text into a list of FileDiff objects."""
     files: list[FileDiff] = []
     current: FileDiff | None = None
     current_hunk: list[str] = []
@@ -93,7 +93,7 @@ def parse_diff(raw_diff: str) -> list[FileDiff]:
             continue
 
         if binary_re.match(line):
-            current.hunks.append("[바이너리 파일 변경]")
+            current.hunks.append("[binary file changed]")
             continue
 
         if hunk_start_re.match(line):
@@ -101,7 +101,7 @@ def parse_diff(raw_diff: str) -> list[FileDiff]:
             current_hunk.append(line)
             continue
 
-        # --- / +++ 헤더는 hunk에 포함하지 않음
+        # skip --- / +++ header lines
         if old_path_re.match(line) or line.startswith("+++ b/"):
             continue
 

@@ -1,4 +1,4 @@
-"""Gemini API를 이용한 코드 리뷰어."""
+"""Code reviewer using the Gemini API."""
 
 from __future__ import annotations
 
@@ -14,7 +14,28 @@ load_dotenv()
 
 MODEL = "gemini-2.5-flash-lite"
 
-SYSTEM_PROMPT = """\
+_SYSTEM_PROMPTS: dict[str, str] = {
+    "en": """\
+You are an expert code reviewer. Analyze the provided git diff and respond in English \
+using ONLY the section format below. Omit any section that has no issues.
+If there are absolutely no issues across all sections, respond with exactly one line: ✅ No issues found
+
+## 🐛 Bugs / Potential Errors
+(bugs, unhandled exceptions, boundary errors, etc. — omit if no issues)
+
+## ⚡ Performance
+(unnecessary computation, inefficient data structures, N+1 queries, etc. — omit if no issues)
+
+## 🔒 Security
+(injection, sensitive data exposure, missing authorization checks, etc. — omit if no issues)
+
+## 💡 Suggestions
+(readability, naming, deduplication, better alternatives, etc. — omit if no issues)
+
+## ✅ Summary
+(one or two sentence summary — always include)
+""",
+    "ko": """\
 You are an expert code reviewer. Analyze the provided git diff and respond in Korean \
 using ONLY the section format below. Omit any section that has no issues.
 If there are absolutely no issues across all sections, respond with exactly one line: ✅ 문제 없음
@@ -33,12 +54,13 @@ If there are absolutely no issues across all sections, respond with exactly one 
 
 ## ✅ 총평
 (한두 줄 요약 — 항상 포함)
-"""
+""",
+}
 
 REVIEW_TEMPLATE = """\
-다음 파일의 변경 사항을 리뷰해줘.
+Review the following file changes.
 
-**파일**: `{path}`
+**File**: `{path}`
 
 ```diff
 {diff}
@@ -61,8 +83,8 @@ def _get_client() -> genai.Client:
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise EnvironmentError(
-            "GEMINI_API_KEY가 설정되지 않았습니다. "
-            ".env 파일 또는 환경변수를 확인하세요."
+            "GEMINI_API_KEY is not set. "
+            "Check your .env file or environment variables."
         )
     return genai.Client(api_key=api_key)
 
@@ -70,14 +92,16 @@ def _get_client() -> genai.Client:
 def review_file(
     file_diff,
     client: genai.Client | None = None,
+    lang: str = "en",
 ) -> ReviewResult:
-    """단일 파일 diff를 Gemini에 보내고 리뷰를 받는다."""
+    """Send a single file diff to Gemini and return the review."""
     if client is None:
         client = _get_client()
 
+    system_prompt = _SYSTEM_PROMPTS.get(lang, _SYSTEM_PROMPTS["en"])
     prompt = REVIEW_TEMPLATE.format(
         path=file_diff.path,
-        diff=file_diff.diff_text[:8000],  # 토큰 초과 방지
+        diff=file_diff.diff_text[:8000],  # cap to avoid token overflow
     )
 
     try:
@@ -85,7 +109,7 @@ def review_file(
             model=MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT,
+                system_instruction=system_prompt,
             ),
         )
         return ReviewResult(path=file_diff.path, review=response.text)
@@ -93,9 +117,9 @@ def review_file(
         return ReviewResult(path=file_diff.path, review="", error=str(exc))
 
 
-def review_all(file_diffs: list) -> list[ReviewResult]:
-    """여러 파일을 병렬로 리뷰하되 입력 순서를 유지한다."""
+def review_all(file_diffs: list, lang: str = "en") -> list[ReviewResult]:
+    """Review multiple files in parallel while preserving input order."""
     client = _get_client()
     with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [executor.submit(review_file, fd, client) for fd in file_diffs]
+        futures = [executor.submit(review_file, fd, client, lang) for fd in file_diffs]
     return [f.result() for f in futures]
