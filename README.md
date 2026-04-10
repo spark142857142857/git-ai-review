@@ -3,6 +3,8 @@
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Model](https://img.shields.io/badge/model-gemini--2.5--flash--lite-orange)
+[![PyPI version](https://img.shields.io/pypi/v/git-ai-review)](https://pypi.org/project/git-ai-review/)
+[![Python versions](https://img.shields.io/pypi/pyversions/git-ai-review)](https://pypi.org/project/git-ai-review/)
 
 A CLI tool that reads your `git diff` and delivers AI-powered code reviews via the Gemini API.
 
