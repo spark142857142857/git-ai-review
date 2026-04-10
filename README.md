@@ -8,7 +8,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/git-ai-review)](https://pypi.org/project/git-ai-review/)
 [![Python versions](https://img.shields.io/pypi/pyversions/git-ai-review)](https://pypi.org/project/git-ai-review/)
 
-A CLI tool that reads your `git diff` and delivers AI-powered code reviews via the Gemini API. 
+A CLI tool that reads your `git diff` and delivers AI-powered code reviews via the Gemini API.
 
 ---
 
