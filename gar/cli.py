@@ -12,6 +12,7 @@ from rich.console import Console
 from gar import __version__
 from gar.formatter import print_all_reviews, save_markdown
 from gar.git_utils import parse_diff, run_git_diff
+from gar.hooks import hook_exists, install_hook, is_gar_hook, uninstall_hook
 from gar.reviewer import review_all
 
 MAX_FILES = 20
@@ -120,3 +121,46 @@ def review(
         console.print(f"[green]Markdown saved:[/green] {path}")
     else:
         print_all_reviews(results)
+
+
+@app.command(name="install-hook")
+def install_hook_cmd(
+    repo: Annotated[
+        Optional[Path],
+        typer.Option("--repo", "-r", help="Path to the git repository (default: cwd)"),
+    ] = None,
+) -> None:
+    """Install a git pre-commit hook that runs gar review --staged before each commit."""
+    if hook_exists(repo):
+        if is_gar_hook(repo):
+            msg = "gar pre-commit hook is already installed. Overwrite?"
+        else:
+            msg = "A pre-commit hook already exists (not from gar). Overwrite?"
+        if not typer.confirm(msg, default=False):
+            raise typer.Exit()
+
+    try:
+        path = install_hook(repo)
+        console.print(f"[green]✓ Pre-commit hook installed:[/green] {path}")
+    except FileNotFoundError as exc:
+        err_console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(1) from exc
+
+
+@app.command(name="uninstall-hook")
+def uninstall_hook_cmd(
+    repo: Annotated[
+        Optional[Path],
+        typer.Option("--repo", "-r", help="Path to the git repository (default: cwd)"),
+    ] = None,
+) -> None:
+    """Remove the gar pre-commit hook."""
+    try:
+        path = uninstall_hook(repo)
+        console.print(f"[green]✓ Pre-commit hook removed:[/green] {path}")
+    except FileNotFoundError as exc:
+        err_console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(1) from exc
+    except PermissionError as exc:
+        err_console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(1) from exc

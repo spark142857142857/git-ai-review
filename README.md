@@ -1,5 +1,7 @@
 # git-ai-review (`gar`)
 
+[한국어](README.ko.md)
+
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Model](https://img.shields.io/badge/model-gemini--2.5--flash--lite-orange)
@@ -97,6 +99,24 @@ gar review --output md --output-file reviews/sprint42.md
 # Review a repository in another directory
 gar review --repo ../other-project
 ```
+
+---
+
+## Pre-commit Hook
+
+`gar` can automatically review staged changes before each commit.
+
+```bash
+# Install the hook
+gar install-hook
+
+# Remove the hook
+gar uninstall-hook
+```
+
+Once installed, every `git commit` triggers `gar review --staged` and prints the review inline. The hook is informational — it **does not block** commits based on review findings.
+
+If a hook already exists, you will be prompted before overwriting.
 
 ---
 
