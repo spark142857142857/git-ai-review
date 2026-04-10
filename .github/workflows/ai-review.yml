@@ -1,0 +1,116 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history required for cross-branch diff
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install git-ai-review
+        # Once published to PyPI, change to: pip install git-ai-review
+        run: pip install .
+
+      - name: Run AI review and post PR comment
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          REPO: ${{ github.repository }}
+        run: |
+          python << 'PYEOF'
+          import json
+          import os
+          import subprocess
+          import urllib.request
+
+          from gar.git_utils import parse_diff
+          from gar.reviewer import review_all
+
+          MAX_FILES = 20
+          COMMENT_LIMIT = 65000  # GitHub comment body cap (hard limit: 65536)
+
+          # ── 1. Get PR diff ────────────────────────────────────────────────
+          base_ref = os.environ["BASE_REF"]
+          proc = subprocess.run(
+              ["git", "diff", f"origin/{base_ref}...HEAD"],
+              capture_output=True,
+              text=True,
+              encoding="utf-8",
+          )
+          raw_diff = proc.stdout
+
+          if not raw_diff.strip():
+              print("No changes detected — skipping review.")
+              raise SystemExit(0)
+
+          # ── 2. Parse diff ─────────────────────────────────────────────────
+          file_diffs = parse_diff(raw_diff)
+          if not file_diffs:
+              print("No parseable diff — skipping review.")
+              raise SystemExit(0)
+
+          truncated = len(file_diffs) > MAX_FILES
+          if truncated:
+              file_diffs = file_diffs[:MAX_FILES]
+
+          print(f"Reviewing {len(file_diffs)} file(s)...")
+
+          # ── 3. Gemini review ──────────────────────────────────────────────
+          results = review_all(file_diffs)
+
+          # ── 4. Build markdown comment ─────────────────────────────────────
+          lines = [
+              "## 🤖 AI Code Review",
+              "",
+              "_Powered by [git-ai-review](https://github.com/spark142857142857/git-ai-review)"
+              " · Gemini 2.5 Flash Lite_",
+          ]
+          if truncated:
+              lines.append(f"\n> ⚠️ Only the first {MAX_FILES} files are reviewed.")
+
+          for r in results:
+              lines.append(f"\n### `{r.path}`\n")
+              if r.error:
+                  lines.append(f"> ⚠️ **Error**: {r.error}")
+              else:
+                  lines.append(r.review)
+              lines.append("\n---")
+
+          body = "\n".join(lines)
+          if len(body) > COMMENT_LIMIT:
+              body = body[:COMMENT_LIMIT] + "\n\n_...review truncated due to size limit_"
+
+          # ── 5. Post PR comment via GitHub API ─────────────────────────────
+          pr_number = os.environ["PR_NUMBER"]
+          repo = os.environ["REPO"]
+          token = os.environ["GITHUB_TOKEN"]
+
+          url = f"https://api.github.com/repos/{repo}/issues/{pr_number}/comments"
+          req = urllib.request.Request(
+              url,
+              data=json.dumps({"body": body}).encode(),
+              headers={
+                  "Authorization": f"Bearer {token}",
+                  "Accept": "application/vnd.github+json",
+                  "Content-Type": "application/json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              },
+              method="POST",
+          )
+          with urllib.request.urlopen(req) as resp:
+              print(f"PR comment posted (HTTP {resp.status})")
+          PYEOF
